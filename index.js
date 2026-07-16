@@ -1,6 +1,5 @@
-
 const express = require('express');
-const axios = require('axios'); // تأكد من إضافة axios في package.json
+const axios = require('axios');
 const app = express();
 
 app.get('/vidsrc/:id', async (req, res) => {
@@ -8,18 +7,17 @@ app.get('/vidsrc/:id', async (req, res) => {
     const embedUrl = `https://vidsrc.cc/v2/embed/movie/${tmdbId}`;
     
     try {
-        // هنا نقوم بطلب الصفحة واستخراج رابط الفيديو منها
-        const response = await axios.get(embedUrl);
-        const html = response.data;
+        // هنا يجب أن يقوم السيرفر بطلب الصفحة واستخراج رابط البث منها
+        // ملاحظة: vidsrc غالباً تحتاج إلى محاكي متصفح أو التعامل مع الـ API الداخلي الخاص بهم
+        // سأقوم هنا بإرجاع الرابط الذي يحتاجه المشغل (يجب تحديث هذا الجزء حسب الموقع)
         
-        // هذا مجرد مثال: يجب أن تبحث عن الرابط الحقيقي داخل الـ HTML
-        // سأضع رابطاً تجريبياً لنتأكد هل المشكلة من الرابط أم من المشغل
         res.json({
             status: "success",
-            stream: "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8" 
+            // هذا الرابط هو الذي سيتم تمريره لـ ExoPlayer
+            stream: "رابط_الفيديو_المباشر_هنا.m3u8" 
         });
     } catch (error) {
-        res.status(500).json({ status: "error", message: "Failed to fetch stream" });
+        res.status(500).json({ status: "error", message: error.message });
     }
 });
 
