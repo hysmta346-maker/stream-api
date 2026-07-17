@@ -1,17 +1,18 @@
 const express = require('express');
 const axios = require('axios');
 const cors = require('cors');
-const cheerio = require('cheerio'); // مكتبة القشط الجديدة
+const cheerio = require('cheerio');
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
 
-// مسار جلب رابط الفيديو المباشر
-// الاستخدام: /api/stream/movie?vid=a02e077b5
+// تعريف ثابت للمتصفح لمحاكاة طلب حقيقي
+const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
+
 app.get('/api/stream/movie', async (req, res) => {
-    const vid = req.query.vid;
+    const { vid } = req.query;
 
     if (!vid) {
         return res.status(400).json({ success: false, message: 'يرجى إرسال الـ vid' });
@@ -20,52 +21,59 @@ app.get('/api/stream/movie', async (req, res) => {
     const qFilmUrl = `https://a.qfilm.tv/watch.php?vid=${vid}`;
 
     try {
-        // 1. جلب صفحة QFilm
+        // 1. جلب صفحة QFilm مع Headers لمحاكاة متصفح Chrome
         const qFilmResponse = await axios.get(qFilmUrl, {
-            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36' }
+            headers: {
+                'User-Agent': USER_AGENT,
+                'Referer': 'https://a.qfilm.tv/',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.5',
+                'Connection': 'keep-alive',
+                'Upgrade-Insecure-Requests': '1'
+            }
         });
         
-        const $q = cheerio.load(qFilmResponse.data);
-        const liiivideoUrl = $q('meta[itemprop="contentUrl"]').attr('content');
+        const $ = cheerio.load(qFilmResponse.data);
+        const liiivideoUrl = $('meta[itemprop="contentUrl"]').attr('content');
 
         if (!liiivideoUrl) {
-            throw new Error("لم يتم العثور على رابط LiiiVideo");
+            return res.status(404).json({ success: false, message: "لم يتم العثور على رابط liiivideo" });
         }
 
-        // 2. جلب صفحة LiiiVideo لاستخراج رابط m3u8
+        // 2. جلب صفحة liiivideo لاستخراج الرابط المباشر
         const liiiResponse = await axios.get(liiivideoUrl, {
-            headers: { 'Referer': qFilmUrl, 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
+            headers: {
+                'User-Agent': USER_AGENT,
+                'Referer': qFilmUrl,
+                'Accept': '*/*'
+            }
         });
         
-        const liiiData = liiiResponse.data;
-
-        // 3. البحث عن رابط m3u8 باستخدام Regex (كما جربنا في تيرمكس)
+        // البحث عن الرابط باستخدام Regex
         const m3u8Regex = /https?:\/\/[^\"']+\.(m3u8|m3u)/;
-        const match = liiiData.match(m3u8Regex);
+        const match = liiiResponse.data.match(m3u8Regex);
 
         if (match) {
             return res.status(200).json({
                 success: true,
-                url: match[0], // هذا هو الرابط المباشر للتشغيل
-                source: "LiiiVideo"
+                url: match[0]
             });
         } else {
-            throw new Error("لم يتم العثور على رابط m3u8 داخل صفحة البث");
+            return res.status(404).json({ success: false, message: "تعذر استخراج رابط البث المباشر" });
         }
 
     } catch (error) {
         console.error('Error:', error.message);
         return res.status(500).json({
             success: false,
-            message: 'فشل استخراج الرابط',
+            message: 'فشل السيرفر في جلب البيانات',
             error: error.message
         });
     }
 });
 
-// اختبار السيرفر
 app.get('/', (req, res) => {
-    res.status(200).send('StreamMaster Scraper API is running! 🚀');
+    res.status(200).send('StreamMaster API is running perfectly! 🚀');
 });
 
 module.exports = app;
